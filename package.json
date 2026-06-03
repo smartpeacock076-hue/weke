@@ -1,0 +1,17 @@
+{
+  "name": "weke-deploy",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "نقطة تشغيل Railway — تُشغّل سيرفر لاسلكي الموجود في مجلّد server/",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "start": "node --experimental-sqlite server/server.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.7.0",
+    "ws": "^8.18.0"
+  }
+}
