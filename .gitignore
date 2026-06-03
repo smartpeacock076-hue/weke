@@ -17,6 +17,7 @@ Lasilki/android/app/google-services.json
 Lasilki/android/.gradle/
 Lasilki/android/.cxx/
 Lasilki/.bundletest/
+.iconwork/
 
 # نظام التشغيل والمحرر
 .DS_Store
