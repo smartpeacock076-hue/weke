@@ -139,7 +139,7 @@ export default function LoginScreen() {
           <Text style={styles.hint}>وضع متقدّم — اضغط الشعار مطوّلاً للإخفاء</Text>
         )}
 
-        <Text style={styles.version}>الإصدار 2.0</Text>
+        <Text style={styles.version}>الإصدار 2.1 — RTL</Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );
