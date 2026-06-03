@@ -1,0 +1,19 @@
+{
+  "name": "lasilki-server",
+  "version": "1.0.0",
+  "description": "سيرفر تطبيق لاسلكي (Push-to-Talk) شبيه بـ Zello",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node --experimental-sqlite server.js",
+    "dev": "node --watch --experimental-sqlite server.js",
+    "test-client": "node test-client.mjs"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.7.0",
+    "ws": "^8.18.0"
+  }
+}

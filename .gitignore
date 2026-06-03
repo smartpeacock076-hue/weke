@@ -1,0 +1,23 @@
+# اعتماديات
+node_modules/
+**/node_modules/
+
+# بيانات السيرفر وملفاته الحسّاسة
+server/lasilki.db
+server/lasilki.db-*
+server/uploads/
+server/service-account.json
+.env
+
+# Firebase (التطبيق) — يضيفه المستخدم محلياً
+Lasilki/android/app/google-services.json
+
+# مخرجات البناء (يُعاد توليدها)
+**/build/
+Lasilki/android/.gradle/
+Lasilki/android/.cxx/
+Lasilki/.bundletest/
+
+# نظام التشغيل والمحرر
+.DS_Store
+*.log

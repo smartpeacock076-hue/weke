@@ -1,0 +1,6 @@
+node_modules/
+uploads/*.wav
+lasilki.db
+lasilki.db-*
+.env
+service-account.json
