@@ -13,7 +13,7 @@ import {
   userFromToken,
 } from './auth.js';
 import { writeWav } from './wav.js';
-import { saveDeviceToken, notifyUsers } from './fcm.js';
+import { saveDeviceToken, notifyUsers, fcmEnabled } from './fcm.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UPLOADS = path.join(DATA_DIR, 'uploads');
@@ -240,7 +240,7 @@ function serveUpload(req, res, url) {
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   if (url.pathname === '/' || url.pathname === '/health') {
-    return sendJson(res, 200, { ok: true, service: 'lasilki', time: Date.now() });
+    return sendJson(res, 200, { ok: true, service: 'lasilki', fcm: fcmEnabled(), time: Date.now() });
   }
   if (url.pathname.startsWith('/api/')) return handleApi(req, res, url).catch((e) => {
     console.error(e);
