@@ -4,6 +4,7 @@ import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTrack
+import android.media.ToneGenerator
 import android.util.Base64
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
@@ -87,6 +88,21 @@ class AudioStreamPlayerModule(reactContext: ReactApplicationContext) :
         } catch (_: Exception) {
         }
         audioTrack = null
+    }
+
+    /** نغمة قصيرة (بيب). kind=1 بداية الإرسال، غير ذلك نهاية الإرسال (Roger) */
+    @ReactMethod
+    fun beep(kind: Int, durationMs: Int) {
+        Thread {
+            try {
+                val tone = if (kind == 1) ToneGenerator.TONE_PROP_BEEP else ToneGenerator.TONE_PROP_ACK
+                val tg = ToneGenerator(AudioManager.STREAM_MUSIC, 80)
+                tg.startTone(tone, durationMs)
+                Thread.sleep((durationMs + 90).toLong())
+                tg.release()
+            } catch (_: Exception) {
+            }
+        }.start()
     }
 
     // مطلوبة لتوافق NativeEventEmitter

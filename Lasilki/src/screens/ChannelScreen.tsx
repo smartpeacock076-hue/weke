@@ -21,7 +21,7 @@ import {
   User,
 } from '../api';
 import {radio} from '../ws';
-import {ensureMicPermission, player, startCapture, stopCapture} from '../audio';
+import {ensureMicPermission, player, startCapture, stopCapture, vibrate} from '../audio';
 import {ensureNotificationPermission, radioService} from '../service';
 
 Sound.setCategory('Playback');
@@ -69,6 +69,7 @@ export default function ChannelScreen({route, navigation}: any) {
     const offTalkStart = radio.on('talk_start', (msg: any) => {
       if (msg.channelId !== channelId || msg.user.id === me.id) return;
       setTalkingUser(msg.user);
+      vibrate(60);
       player.start();
       radioService.update(name, `📢 ${msg.user.displayName} يتحدث الآن`);
     });
@@ -138,6 +139,8 @@ export default function ChannelScreen({route, navigation}: any) {
     }
     setTransmitting(true);
     transmittingRef.current = true;
+    player.beepStart();
+    vibrate(40);
     radio.talkStart();
     radioService.update(name, '🎙️ جارٍ الإرسال…');
     startCapture(chunk => radio.sendAudio(chunk));
@@ -149,6 +152,7 @@ export default function ChannelScreen({route, navigation}: any) {
     setTransmitting(false);
     await stopCapture();
     radio.talkEnd();
+    player.beepEnd();
     radioService.update(name, 'متصل بالقناة');
   };
 

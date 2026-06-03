@@ -1,5 +1,5 @@
 // طبقة الصوت: التقاط الصوت (PCM) عبر react-native-audio-record + تشغيله مباشرة عبر الوحدة الأصلية
-import {NativeModules, PermissionsAndroid, Platform} from 'react-native';
+import {NativeModules, PermissionsAndroid, Platform, Vibration} from 'react-native';
 import AudioRecord from 'react-native-audio-record';
 import {AUDIO} from './config';
 
@@ -68,6 +68,18 @@ export const player = {
   stop() {
     AudioStreamPlayer?.stop();
   },
+  beepStart() {
+    AudioStreamPlayer?.beep(1, 140);
+  },
+  beepEnd() {
+    AudioStreamPlayer?.beep(2, 170);
+  },
 };
+
+export function vibrate(ms = 40) {
+  try {
+    Vibration.vibrate(ms);
+  } catch {}
+}
 
 export const playerAvailable = !!AudioStreamPlayer;
