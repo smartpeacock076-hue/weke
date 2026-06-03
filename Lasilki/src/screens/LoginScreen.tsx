@@ -21,6 +21,7 @@ export default function LoginScreen() {
   const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
   const [server, setServer] = useState(getServerUrl());
+  const [showServer, setShowServer] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -50,7 +51,9 @@ export default function LoginScreen() {
       style={{flex: 1, backgroundColor: colors.bg}}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <Text style={styles.logo}>📻</Text>
+        <Pressable onLongPress={() => setShowServer(s => !s)} delayLongPress={700}>
+          <Text style={styles.logo}>📻</Text>
+        </Pressable>
         <Text style={styles.title}>لاسلكي</Text>
         <Text style={styles.subtitle}>تكلّم مباشرة كأنك تحمل جهاز لاسلكي</Text>
 
@@ -103,16 +106,20 @@ export default function LoginScreen() {
             placeholderTextColor={colors.textDim}
           />
 
-          <Text style={styles.label}>عنوان السيرفر</Text>
-          <TextInput
-            style={styles.input}
-            value={server}
-            onChangeText={setServer}
-            autoCapitalize="none"
-            keyboardType="url"
-            placeholder="http://10.0.2.2:4000"
-            placeholderTextColor={colors.textDim}
-          />
+          {showServer && (
+            <>
+              <Text style={styles.label}>عنوان السيرفر (متقدّم)</Text>
+              <TextInput
+                style={styles.input}
+                value={server}
+                onChangeText={setServer}
+                autoCapitalize="none"
+                keyboardType="url"
+                placeholder="https://..."
+                placeholderTextColor={colors.textDim}
+              />
+            </>
+          )}
 
           {!!error && <Text style={styles.error}>{error}</Text>}
 
@@ -128,9 +135,9 @@ export default function LoginScreen() {
           </Pressable>
         </View>
 
-        <Text style={styles.hint}>
-          المحاكي: 10.0.2.2 — الجهاز الحقيقي: عنوان IP لجهاز الكمبيوتر
-        </Text>
+        {showServer && (
+          <Text style={styles.hint}>وضع متقدّم — اضغط الشعار مطوّلاً للإخفاء</Text>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );
