@@ -2,6 +2,7 @@ import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   FlatList,
   Pressable,
   StyleSheet,
@@ -43,6 +44,7 @@ export default function ChannelScreen({route, navigation}: any) {
   const transmittingRef = useRef(false);
   const talkingRef = useRef<User | null>(null);
   const soundRef = useRef<any>(null);
+  const pulse = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     transmittingRef.current = transmitting;
@@ -50,6 +52,18 @@ export default function ChannelScreen({route, navigation}: any) {
   useEffect(() => {
     talkingRef.current = talkingUser;
   }, [talkingUser]);
+
+  // حركة نبض حول زر التحدّث عند الإرسال أو الاستقبال
+  useEffect(() => {
+    if (transmitting || talkingUser) {
+      const loop = Animated.loop(
+        Animated.timing(pulse, {toValue: 1, duration: 1100, useNativeDriver: true}),
+      );
+      loop.start();
+      return () => loop.stop();
+    }
+    pulse.setValue(0);
+  }, [transmitting, talkingUser, pulse]);
 
   // الانضمام للقناة + تحميل البيانات + طلب إذن الميكروفون مسبقاً
   useEffect(() => {
@@ -231,23 +245,40 @@ export default function ChannelScreen({route, navigation}: any) {
       {/* منطقة الحالة + زر التحدث */}
       <View style={styles.talkArea}>
         <Text style={[styles.status, {color: status.color}]}>{status.text}</Text>
-        <Pressable
-          onPressIn={startTalk}
-          onPressOut={endTalk}
-          disabled={!!talkingUser && !transmitting}
-          style={({pressed}) => [
-            styles.pttOuter,
-            transmitting && styles.pttTransmitting,
-            !!talkingUser && !transmitting && styles.pttDisabled,
-            pressed && {transform: [{scale: 0.97}]},
-          ]}>
-          <View style={[styles.pttInner, transmitting && {backgroundColor: colors.danger}]}>
-            <Text style={styles.pttIcon}>🎙️</Text>
-            <Text style={styles.pttText}>
-              {transmitting ? 'تكلّم الآن' : talkingUser ? 'انتظر دورك' : 'اضغط مع الاستمرار'}
-            </Text>
-          </View>
-        </Pressable>
+        <View style={styles.pttWrap}>
+          {(transmitting || !!talkingUser) && (
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.pulseRing,
+                {
+                  borderColor: transmitting ? colors.danger : colors.accent,
+                  transform: [
+                    {scale: pulse.interpolate({inputRange: [0, 1], outputRange: [1, 1.45]})},
+                  ],
+                  opacity: pulse.interpolate({inputRange: [0, 1], outputRange: [0.55, 0]}),
+                },
+              ]}
+            />
+          )}
+          <Pressable
+            onPressIn={startTalk}
+            onPressOut={endTalk}
+            disabled={!!talkingUser && !transmitting}
+            style={({pressed}) => [
+              styles.pttOuter,
+              transmitting && styles.pttTransmitting,
+              !!talkingUser && !transmitting && styles.pttDisabled,
+              pressed && {transform: [{scale: 0.97}]},
+            ]}>
+            <View style={[styles.pttInner, transmitting && {backgroundColor: colors.danger}]}>
+              <Text style={styles.pttIcon}>🎙️</Text>
+              <Text style={styles.pttText}>
+                {transmitting ? 'تكلّم الآن' : talkingUser ? 'انتظر دورك' : 'اضغط مع الاستمرار'}
+              </Text>
+            </View>
+          </Pressable>
+        </View>
       </View>
 
       {/* تبويبات السجل / المتصلون */}
@@ -309,6 +340,14 @@ const styles = StyleSheet.create({
   subtitle: {color: colors.online, fontSize: 12, marginTop: 2},
   talkArea: {alignItems: 'center', paddingVertical: 22},
   status: {fontSize: 15, fontWeight: '700', marginBottom: 18, height: 22},
+  pttWrap: {width: 240, height: 240, alignItems: 'center', justifyContent: 'center'},
+  pulseRing: {
+    position: 'absolute',
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    borderWidth: 6,
+  },
   pttOuter: {
     width: 200,
     height: 200,

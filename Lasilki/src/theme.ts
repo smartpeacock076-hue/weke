@@ -1,18 +1,19 @@
 // ألوان وأنماط موحّدة بطابع "جهاز لاسلكي" داكن
 export const colors = {
-  bg: '#0E1116',
-  card: '#171C24',
-  cardAlt: '#1F2630',
-  border: '#2A323D',
-  text: '#F2F5F8',
-  textDim: '#8A97A6',
-  primary: '#16A34A', // أخضر إرسال
-  primaryDark: '#0F7A37',
-  danger: '#DC2626',
-  accent: '#F59E0B', // كهرماني (يتحدث الآن)
-  online: '#22C55E',
+  bg: '#0B0F14',
+  card: '#141B24',
+  cardAlt: '#1C2530',
+  border: '#28323F',
+  text: '#F4F7FA',
+  textDim: '#8593A3',
+  primary: '#F5871F', // برتقالي العلامة (أزرار/تبويبات/PTT)
+  primaryDark: '#D26E0E',
+  secondary: '#3B86F0', // أزرق العلامة
+  danger: '#E5484D', // أحمر الإرسال
+  accent: '#F5A623', // كهرماني (يتحدث الآن)
+  online: '#3FB950',
   offline: '#5B6573',
-  blue: '#2563EB',
+  blue: '#3B86F0',
 };
 
 export const radius = { sm: 8, md: 14, lg: 22, pill: 999 };

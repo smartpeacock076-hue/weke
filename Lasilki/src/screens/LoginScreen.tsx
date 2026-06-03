@@ -138,6 +138,8 @@ export default function LoginScreen() {
         {showServer && (
           <Text style={styles.hint}>وضع متقدّم — اضغط الشعار مطوّلاً للإخفاء</Text>
         )}
+
+        <Text style={styles.version}>الإصدار 2.0</Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -194,4 +196,5 @@ const styles = StyleSheet.create({
   },
   buttonText: {color: '#fff', fontWeight: '800', fontSize: 16},
   hint: {color: colors.textDim, fontSize: 12, textAlign: 'center', marginTop: 18},
+  version: {color: colors.textDim, fontSize: 12, textAlign: 'center', marginTop: 16, opacity: 0.7},
 });
