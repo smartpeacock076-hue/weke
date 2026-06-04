@@ -68,9 +68,11 @@ export default function ChannelScreen({route, navigation}: any) {
   // الانضمام للقناة + تحميل البيانات + طلب إذن الميكروفون مسبقاً
   useEffect(() => {
     radio.join(channelId);
-    ensureMicPermission();
     ensureNotificationPermission();
-    radioService.start(name, 'متصل بالقناة');
+    // ابدأ خدمة الخلفية (نوع ميكروفون) فقط بعد منح إذن الميكروفون — يتفادى كراش أندرويد 14
+    ensureMicPermission().then(ok => {
+      if (ok) radioService.start(name, 'متصل بالقناة');
+    });
     (async () => {
       try {
         const [h, m] = await Promise.all([getHistory(channelId), getMembers(channelId)]);
