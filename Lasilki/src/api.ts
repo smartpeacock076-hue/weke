@@ -6,10 +6,14 @@ export type User = {id: number; username: string; displayName: string};
 export type Channel = {
   id: number;
   name: string;
+  type: 'group' | 'dm';
   description: string;
   members: number;
   online: number;
-  joined: boolean;
+};
+export type Friend = {id: number; username: string; displayName: string};
+export type SearchUser = Friend & {
+  status: 'none' | 'requested' | 'incoming' | 'friends';
 };
 export type Message = {
   id: number;
@@ -112,9 +116,45 @@ export async function listChannels(): Promise<Channel[]> {
   return data.channels;
 }
 
-export async function createChannel(name: string, description: string): Promise<Channel> {
-  const data = await apiFetch('/api/channels', {method: 'POST', body: {name, description}});
+export async function createChannel(name: string): Promise<Channel> {
+  const data = await apiFetch('/api/channels', {method: 'POST', body: {name}});
   return data.channel;
+}
+
+export async function searchUsers(q: string): Promise<SearchUser[]> {
+  const data = await apiFetch(`/api/users/search?q=${encodeURIComponent(q)}`);
+  return data.users;
+}
+
+export async function getFriends(): Promise<Friend[]> {
+  const data = await apiFetch('/api/friends');
+  return data.friends;
+}
+
+export async function getFriendRequests(): Promise<Friend[]> {
+  const data = await apiFetch('/api/friends/requests');
+  return data.requests;
+}
+
+export async function sendFriendRequest(username: string) {
+  return apiFetch('/api/friends/request', {method: 'POST', body: {username}});
+}
+
+export async function acceptFriend(userId: number) {
+  return apiFetch('/api/friends/accept', {method: 'POST', body: {userId}});
+}
+
+export async function rejectFriend(userId: number) {
+  return apiFetch('/api/friends/reject', {method: 'POST', body: {userId}});
+}
+
+export async function openDM(username: string): Promise<Channel> {
+  const data = await apiFetch('/api/dm', {method: 'POST', body: {username}});
+  return data.channel;
+}
+
+export async function inviteToChannel(channelId: number, username: string) {
+  return apiFetch(`/api/channels/${channelId}/invite`, {method: 'POST', body: {username}});
 }
 
 export async function joinChannel(id: number) {

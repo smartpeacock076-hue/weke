@@ -60,16 +60,29 @@ db.exec(`
     updated_at INTEGER NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS friendships (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    requester_id INTEGER NOT NULL,
+    addressee_id INTEGER NOT NULL,
+    status       TEXT NOT NULL DEFAULT 'pending',
+    created_at   INTEGER NOT NULL,
+    UNIQUE(requester_id, addressee_id)
+  );
+
   CREATE INDEX IF NOT EXISTS idx_messages_channel ON messages(channel_id, created_at);
   CREATE INDEX IF NOT EXISTS idx_memberships_channel ON memberships(channel_id);
+  CREATE INDEX IF NOT EXISTS idx_friendships_addr ON friendships(addressee_id, status);
+  CREATE INDEX IF NOT EXISTS idx_friendships_req ON friendships(requester_id, status);
 `);
 
-// إنشاء قناة عامة افتراضية إن لم توجد أي قناة
-const channelCount = db.prepare('SELECT COUNT(*) AS c FROM channels').get().c;
-if (channelCount === 0) {
-  db.prepare(
-    'INSERT INTO channels (name, description, created_by, created_at) VALUES (?, ?, ?, ?)'
-  ).run('عام', 'القناة العامة للجميع', null, Date.now());
+// ترقية أعمدة جديدة على قواعد بيانات قائمة (تُتجاهل إن وُجدت)
+for (const stmt of [
+  "ALTER TABLE channels ADD COLUMN type TEXT NOT NULL DEFAULT 'group'",
+  'ALTER TABLE channels ADD COLUMN title TEXT',
+]) {
+  try {
+    db.exec(stmt);
+  } catch {}
 }
 
 export default db;

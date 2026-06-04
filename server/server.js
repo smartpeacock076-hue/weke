@@ -57,21 +57,42 @@ function publicUser(u) {
   return { id: u.id, username: u.username, displayName: u.displayName || u.display_name };
 }
 
+function areFriends(a, b) {
+  return !!db
+    .prepare(
+      `SELECT 1 FROM friendships WHERE status='accepted' AND
+       ((requester_id=? AND addressee_id=?) OR (requester_id=? AND addressee_id=?))`,
+    )
+    .get(a, b, b, a);
+}
+
+function isMember(channelId, userId) {
+  return !!db
+    .prepare('SELECT 1 FROM memberships WHERE channel_id=? AND user_id=?')
+    .get(channelId, userId);
+}
+
 function channelDTO(row, userId) {
-  const members = db
-    .prepare('SELECT COUNT(*) AS c FROM memberships WHERE channel_id = ?')
-    .get(row.id).c;
-  const joined = userId
-    ? !!db
-        .prepare('SELECT 1 FROM memberships WHERE channel_id = ? AND user_id = ?')
-        .get(row.id, userId)
-    : false;
+  const memberCount = Number(
+    db.prepare('SELECT COUNT(*) AS c FROM memberships WHERE channel_id = ?').get(row.id).c,
+  );
+  let display = row.title || row.name;
+  if (row.type === 'dm') {
+    const other = db
+      .prepare(
+        `SELECT u.display_name AS displayName FROM memberships m
+         JOIN users u ON u.id = m.user_id
+         WHERE m.channel_id = ? AND m.user_id != ? LIMIT 1`,
+      )
+      .get(row.id, userId);
+    display = other ? other.displayName : 'محادثة';
+  }
   return {
     id: row.id,
-    name: row.name,
-    description: row.description,
-    members: Number(members),
-    joined,
+    name: display,
+    type: row.type || 'group',
+    description: row.description || '',
+    members: memberCount,
     online: presenceList(row.id).length,
   };
 }
@@ -104,13 +125,6 @@ async function handleApi(req, res, url) {
       )
       .run(username, displayName || username, hash, salt, Date.now());
     const userId = Number(info.lastInsertRowid);
-    // الانضمام التلقائي لجميع القنوات العامة الموجودة (لتجربة فورية)
-    const generalChannels = db.prepare('SELECT id FROM channels').all();
-    for (const ch of generalChannels) {
-      db.prepare(
-        'INSERT OR IGNORE INTO memberships (user_id, channel_id, joined_at) VALUES (?, ?, ?)'
-      ).run(userId, ch.id, Date.now());
-    }
     const token = createToken(userId);
     return sendJson(res, 200, {
       token,
@@ -147,45 +161,165 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, { ok: true });
   }
 
-  // قائمة القنوات
+  // محادثاتي فقط (مجموعات + فردي) — لا قنوات عامة
   if (pathname === '/api/channels' && method === 'GET') {
-    const rows = db.prepare('SELECT * FROM channels ORDER BY name').all();
+    const rows = db
+      .prepare(
+        `SELECT c.* FROM channels c
+         JOIN memberships m ON m.channel_id = c.id
+         WHERE m.user_id = ?
+         ORDER BY c.created_at DESC`,
+      )
+      .all(me.id);
     return sendJson(res, 200, { channels: rows.map((r) => channelDTO(r, me.id)) });
   }
 
-  // إنشاء قناة
+  // إنشاء مجموعة خاصة
   if (pathname === '/api/channels' && method === 'POST') {
-    const { name, description } = await readBody(req);
-    if (!name || !name.trim()) return sendJson(res, 400, { error: 'اسم القناة مطلوب' });
-    const exists = db.prepare('SELECT 1 FROM channels WHERE name = ?').get(name.trim());
-    if (exists) return sendJson(res, 409, { error: 'اسم القناة محجوز' });
+    const { name } = await readBody(req);
+    const title = (name || '').trim();
+    if (!title) return sendJson(res, 400, { error: 'اسم المجموعة مطلوب' });
+    const internal = `g_${Date.now()}_${me.id}`;
     const info = db
-      .prepare('INSERT INTO channels (name, description, created_by, created_at) VALUES (?, ?, ?, ?)')
-      .run(name.trim(), description || '', me.id, Date.now());
+      .prepare(
+        "INSERT INTO channels (name, title, type, description, created_by, created_at) VALUES (?, ?, 'group', '', ?, ?)",
+      )
+      .run(internal, title, me.id, Date.now());
     const channelId = Number(info.lastInsertRowid);
     db.prepare('INSERT INTO memberships (user_id, channel_id, joined_at) VALUES (?, ?, ?)').run(
       me.id,
       channelId,
-      Date.now()
+      Date.now(),
     );
     const row = db.prepare('SELECT * FROM channels WHERE id = ?').get(channelId);
     return sendJson(res, 200, { channel: channelDTO(row, me.id) });
   }
 
-  // انضمام / مغادرة قناة + سجل + أعضاء
-  const mChannel = pathname.match(/^\/api\/channels\/(\d+)\/(join|leave|history|members)$/);
+  // بحث المستخدمين بالاسم (لإضافة صديق)
+  if (pathname === '/api/users/search' && method === 'GET') {
+    const q = (url.searchParams.get('q') || '').trim();
+    if (!q) return sendJson(res, 200, { users: [] });
+    const rows = db
+      .prepare(
+        `SELECT id, username, display_name AS displayName FROM users
+         WHERE username LIKE ? AND id != ? ORDER BY username LIMIT 20`,
+      )
+      .all(q + '%', me.id);
+    const users = rows.map((u) => {
+      let status = 'none';
+      const fr = db
+        .prepare(
+          `SELECT requester_id, status FROM friendships WHERE
+           (requester_id=? AND addressee_id=?) OR (requester_id=? AND addressee_id=?)`,
+        )
+        .get(me.id, u.id, u.id, me.id);
+      if (fr) {
+        status = fr.status === 'accepted' ? 'friends' : fr.requester_id === me.id ? 'requested' : 'incoming';
+      }
+      return { ...u, status };
+    });
+    return sendJson(res, 200, { users });
+  }
+
+  // قائمة الأصدقاء
+  if (pathname === '/api/friends' && method === 'GET') {
+    const rows = db
+      .prepare(
+        `SELECT u.id, u.username, u.display_name AS displayName FROM friendships f
+         JOIN users u ON u.id = CASE WHEN f.requester_id=? THEN f.addressee_id ELSE f.requester_id END
+         WHERE f.status='accepted' AND (f.requester_id=? OR f.addressee_id=?)
+         ORDER BY u.display_name`,
+      )
+      .all(me.id, me.id, me.id);
+    return sendJson(res, 200, { friends: rows });
+  }
+
+  // طلبات الصداقة الواردة
+  if (pathname === '/api/friends/requests' && method === 'GET') {
+    const rows = db
+      .prepare(
+        `SELECT u.id, u.username, u.display_name AS displayName FROM friendships f
+         JOIN users u ON u.id = f.requester_id
+         WHERE f.addressee_id=? AND f.status='pending' ORDER BY f.created_at DESC`,
+      )
+      .all(me.id);
+    return sendJson(res, 200, { requests: rows });
+  }
+
+  // إرسال طلب صداقة بالاسم
+  if (pathname === '/api/friends/request' && method === 'POST') {
+    const { username } = await readBody(req);
+    const target = db.prepare('SELECT id FROM users WHERE username=?').get((username || '').trim());
+    if (!target) return sendJson(res, 404, { error: 'المستخدم غير موجود' });
+    if (target.id === me.id) return sendJson(res, 400, { error: 'لا يمكنك إضافة نفسك' });
+    const incoming = db
+      .prepare("SELECT id FROM friendships WHERE requester_id=? AND addressee_id=? AND status='pending'")
+      .get(target.id, me.id);
+    if (incoming) {
+      db.prepare("UPDATE friendships SET status='accepted' WHERE id=?").run(incoming.id);
+      return sendJson(res, 200, { ok: true, status: 'friends' });
+    }
+    db.prepare(
+      "INSERT OR IGNORE INTO friendships (requester_id, addressee_id, status, created_at) VALUES (?, ?, 'pending', ?)",
+    ).run(me.id, target.id, Date.now());
+    return sendJson(res, 200, { ok: true, status: 'requested' });
+  }
+
+  // قبول طلب صداقة
+  if (pathname === '/api/friends/accept' && method === 'POST') {
+    const { userId } = await readBody(req);
+    const r = db
+      .prepare("UPDATE friendships SET status='accepted' WHERE requester_id=? AND addressee_id=? AND status='pending'")
+      .run(Number(userId), me.id);
+    return sendJson(res, 200, { ok: r.changes > 0 });
+  }
+
+  // رفض طلب صداقة
+  if (pathname === '/api/friends/reject' && method === 'POST') {
+    const { userId } = await readBody(req);
+    db.prepare("DELETE FROM friendships WHERE requester_id=? AND addressee_id=? AND status='pending'").run(
+      Number(userId),
+      me.id,
+    );
+    return sendJson(res, 200, { ok: true });
+  }
+
+  // فتح/إنشاء محادثة فردية مع صديق
+  if (pathname === '/api/dm' && method === 'POST') {
+    const { username } = await readBody(req);
+    const other = db
+      .prepare('SELECT id, display_name AS displayName FROM users WHERE username=?')
+      .get((username || '').trim());
+    if (!other) return sendJson(res, 404, { error: 'المستخدم غير موجود' });
+    if (other.id === me.id) return sendJson(res, 400, { error: 'لا يمكنك محادثة نفسك' });
+    if (!areFriends(me.id, other.id)) return sendJson(res, 403, { error: 'أضِفه صديقاً أولاً' });
+    const a = Math.min(me.id, other.id);
+    const b = Math.max(me.id, other.id);
+    const internal = `dm_${a}_${b}`;
+    let row = db.prepare('SELECT * FROM channels WHERE name=?').get(internal);
+    if (!row) {
+      const info = db
+        .prepare(
+          "INSERT INTO channels (name, title, type, description, created_by, created_at) VALUES (?, '', 'dm', '', ?, ?)",
+        )
+        .run(internal, me.id, Date.now());
+      const cid = Number(info.lastInsertRowid);
+      db.prepare('INSERT OR IGNORE INTO memberships (user_id, channel_id, joined_at) VALUES (?, ?, ?)').run(me.id, cid, Date.now());
+      db.prepare('INSERT OR IGNORE INTO memberships (user_id, channel_id, joined_at) VALUES (?, ?, ?)').run(other.id, cid, Date.now());
+      row = db.prepare('SELECT * FROM channels WHERE id=?').get(cid);
+    }
+    return sendJson(res, 200, { channel: channelDTO(row, me.id) });
+  }
+
+  // إجراءات المحادثة الخاصة (يجب أن تكون عضواً)
+  const mChannel = pathname.match(/^\/api\/channels\/(\d+)\/(leave|history|members|invite)$/);
   if (mChannel) {
     const channelId = Number(mChannel[1]);
     const action = mChannel[2];
     const ch = db.prepare('SELECT * FROM channels WHERE id = ?').get(channelId);
-    if (!ch) return sendJson(res, 404, { error: 'القناة غير موجودة' });
+    if (!ch) return sendJson(res, 404, { error: 'المحادثة غير موجودة' });
+    if (!isMember(channelId, me.id)) return sendJson(res, 403, { error: 'لست عضواً في هذه المحادثة' });
 
-    if (action === 'join' && method === 'POST') {
-      db.prepare(
-        'INSERT OR IGNORE INTO memberships (user_id, channel_id, joined_at) VALUES (?, ?, ?)'
-      ).run(me.id, channelId, Date.now());
-      return sendJson(res, 200, { ok: true, channel: channelDTO(ch, me.id) });
-    }
     if (action === 'leave' && method === 'POST') {
       db.prepare('DELETE FROM memberships WHERE user_id = ? AND channel_id = ?').run(me.id, channelId);
       return sendJson(res, 200, { ok: true });
@@ -193,7 +327,7 @@ async function handleApi(req, res, url) {
     if (action === 'history' && method === 'GET') {
       const rows = db
         .prepare(
-          'SELECT id, user_id AS userId, username, file, duration_ms AS durationMs, created_at AS createdAt FROM messages WHERE channel_id = ? ORDER BY created_at DESC LIMIT 50'
+          'SELECT id, user_id AS userId, username, file, duration_ms AS durationMs, created_at AS createdAt FROM messages WHERE channel_id = ? ORDER BY created_at DESC LIMIT 50',
         )
         .all(channelId);
       return sendJson(res, 200, { messages: rows });
@@ -203,15 +337,20 @@ async function handleApi(req, res, url) {
         .prepare(
           `SELECT u.id, u.username, u.display_name AS displayName
            FROM memberships m JOIN users u ON u.id = m.user_id
-           WHERE m.channel_id = ? ORDER BY u.display_name`
+           WHERE m.channel_id = ? ORDER BY u.display_name`,
         )
         .all(channelId);
       const onlineIds = new Set(presenceList(channelId).map((p) => p.id));
-      return sendJson(
-        res,
-        200,
-        { members: rows.map((r) => ({ ...r, online: onlineIds.has(r.id) })) }
-      );
+      return sendJson(res, 200, { members: rows.map((r) => ({ ...r, online: onlineIds.has(r.id) })) });
+    }
+    if (action === 'invite' && method === 'POST') {
+      if ((ch.type || 'group') === 'dm') return sendJson(res, 400, { error: 'لا يمكن الدعوة في محادثة فردية' });
+      const { username } = await readBody(req);
+      const target = db.prepare('SELECT id FROM users WHERE username=?').get((username || '').trim());
+      if (!target) return sendJson(res, 404, { error: 'المستخدم غير موجود' });
+      if (!areFriends(me.id, target.id)) return sendJson(res, 403, { error: 'يمكن دعوة الأصدقاء فقط' });
+      db.prepare('INSERT OR IGNORE INTO memberships (user_id, channel_id, joined_at) VALUES (?, ?, ?)').run(target.id, channelId, Date.now());
+      return sendJson(res, 200, { ok: true });
     }
   }
 
@@ -350,11 +489,13 @@ function notifyOfflineMembers(channelId, talker) {
     .filter((id) => id !== talker.id && !connectedIds.has(id));
   if (!offlineIds.length) return;
 
-  const ch = db.prepare('SELECT name FROM channels WHERE id = ?').get(channelId);
+  const ch = db.prepare('SELECT type, title FROM channels WHERE id = ?').get(channelId);
+  // في الفردي يرى المستقبل اسم المتحدث؛ في المجموعة يرى اسم المجموعة
+  const display = ch?.type === 'dm' ? talker.displayName : ch?.title || 'مجموعة';
   notifyUsers(offlineIds, {
-    title: ch?.name ? `📻 ${ch.name}` : '📻 لاسلكي',
+    title: `📻 ${display}`,
     body: `📢 ${talker.displayName} يتحدث الآن`,
-    data: { channelId, type: 'talk_start', channelName: ch?.name || '' },
+    data: { channelId, type: 'talk_start', channelName: display },
   });
 }
 
@@ -391,6 +532,10 @@ wss.on('connection', (ws) => {
     switch (msg.type) {
       case 'join': {
         const channelId = Number(msg.channelId);
+        if (!isMember(channelId, ws.user.id)) {
+          ws.send(JSON.stringify({ type: 'error', error: 'لست عضواً في هذه المحادثة' }));
+          break;
+        }
         if (ws.channelId != null && ws.channelId !== channelId) leaveChannel(ws);
         ws.channelId = channelId;
         if (!channelSockets.has(channelId)) channelSockets.set(channelId, new Set());

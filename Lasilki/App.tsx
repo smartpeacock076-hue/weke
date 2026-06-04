@@ -14,8 +14,11 @@ import {radio} from './src/ws';
 import {initPush, bindNotificationOpen} from './src/push';
 import {colors} from './src/theme';
 import LoginScreen from './src/screens/LoginScreen';
-import ChannelsScreen from './src/screens/ChannelsScreen';
+import HomeScreen from './src/screens/HomeScreen';
 import ChannelScreen from './src/screens/ChannelScreen';
+import SearchScreen from './src/screens/SearchScreen';
+import RequestsScreen from './src/screens/RequestsScreen';
+import CreateGroupScreen from './src/screens/CreateGroupScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -88,8 +91,11 @@ export default function App() {
           <Stack.Navigator screenOptions={{headerShown: false}}>
             {user ? (
               <>
-                <Stack.Screen name="Channels" component={ChannelsScreen} />
+                <Stack.Screen name="Home" component={HomeScreen} />
                 <Stack.Screen name="Channel" component={ChannelScreen} />
+                <Stack.Screen name="Search" component={SearchScreen} />
+                <Stack.Screen name="Requests" component={RequestsScreen} />
+                <Stack.Screen name="CreateGroup" component={CreateGroupScreen} />
               </>
             ) : (
               <Stack.Screen name="Login" component={LoginScreen} />
