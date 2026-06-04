@@ -199,12 +199,13 @@ async function handleApi(req, res, url) {
   if (pathname === '/api/users/search' && method === 'GET') {
     const q = (url.searchParams.get('q') || '').trim();
     if (!q) return sendJson(res, 200, { users: [] });
+    const like = '%' + q + '%';
     const rows = db
       .prepare(
         `SELECT id, username, display_name AS displayName FROM users
-         WHERE username LIKE ? AND id != ? ORDER BY username LIMIT 20`,
+         WHERE (username LIKE ? OR display_name LIKE ?) AND id != ? ORDER BY username LIMIT 20`,
       )
-      .all(q + '%', me.id);
+      .all(like, like, me.id);
     const users = rows.map((u) => {
       let status = 'none';
       const fr = db
