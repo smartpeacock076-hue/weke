@@ -29,30 +29,31 @@ class AudioStreamPlayerModule(reactContext: ReactApplicationContext) :
     fun start(sampleRate: Int) {
         executor.execute {
             stopInternal()
-            val minBuf = AudioTrack.getMinBufferSize(
-                sampleRate,
-                AudioFormat.CHANNEL_OUT_MONO,
-                AudioFormat.ENCODING_PCM_16BIT
-            )
-            // مخزن مؤقت ~0.5 ثانية لتفادي التقطيع مع إبقاء التأخير منخفضاً
-            val bufferSize = maxOf(minBuf, sampleRate)
-            val track = AudioTrack(
-                AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_MEDIA)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                    .build(),
-                AudioFormat.Builder()
-                    .setSampleRate(sampleRate)
-                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                    .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
-                    .build(),
-                bufferSize,
-                AudioTrack.MODE_STREAM,
-                AudioManager.AUDIO_SESSION_ID_GENERATE
-            )
-            track.play()
-            audioTrack = track
-            playing = true
+            try {
+                val minBuf = AudioTrack.getMinBufferSize(
+                    sampleRate,
+                    AudioFormat.CHANNEL_OUT_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT
+                )
+                // مخزن صغير لتأخير منخفض (بثّ لحظي) مع هامش لتفادي التقطيع
+                val bufferSize = if (minBuf > 0) minBuf * 2 else sampleRate
+                // المُنشئ الكلاسيكي (STREAM_MUSIC) أوسع توافقاً عبر الأجهزة بما فيها هواوي
+                @Suppress("DEPRECATION")
+                val track = AudioTrack(
+                    AudioManager.STREAM_MUSIC,
+                    sampleRate,
+                    AudioFormat.CHANNEL_OUT_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT,
+                    bufferSize,
+                    AudioTrack.MODE_STREAM
+                )
+                track.play()
+                audioTrack = track
+                playing = true
+            } catch (e: Exception) {
+                playing = false
+                audioTrack = null
+            }
         }
     }
 

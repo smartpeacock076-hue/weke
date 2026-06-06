@@ -86,12 +86,12 @@ export default function ChannelScreen({route, navigation}: any) {
       if (msg.channelId !== channelId || msg.user.id === me.id) return;
       setTalkingUser(msg.user);
       vibrate(60);
-      player.start();
+      player.start(); // بثّ لحظي
       radioService.update(name, `📢 ${msg.user.displayName} يتحدث الآن`);
     });
     const offAudio = radio.on('audio', (msg: any) => {
       if (msg.channelId !== channelId || msg.user.id === me.id) return;
-      player.write(msg.chunk);
+      player.write(msg.chunk); // تشغيل الدفعات فور وصولها
     });
     const offTalkEnd = radio.on('talk_end', (msg: any) => {
       if (msg.channelId !== channelId) return;
@@ -172,7 +172,7 @@ export default function ChannelScreen({route, navigation}: any) {
     radioService.update(name, 'متصل بالقناة');
   };
 
-  const playHistory = (item: Message) => {
+  const playMessage = (item: Message, silent = false) => {
     if (soundRef.current) {
       soundRef.current.release();
       soundRef.current = null;
@@ -181,7 +181,7 @@ export default function ChannelScreen({route, navigation}: any) {
     const s = new Sound(audioUrl(item.file), undefined, (err: any) => {
       if (err) {
         setPlayingId(null);
-        Alert.alert('خطأ', 'تعذّر تشغيل التسجيل');
+        if (!silent) Alert.alert('خطأ', 'تعذّر تشغيل التسجيل');
         return;
       }
       soundRef.current = s;
@@ -204,7 +204,7 @@ export default function ChannelScreen({route, navigation}: any) {
   const renderHistory = ({item}: {item: Message}) => {
     const mine = item.userId === me.id;
     return (
-      <Pressable style={styles.msgRow} onPress={() => playHistory(item)}>
+      <Pressable style={styles.msgRow} onPress={() => playMessage(item)}>
         <View style={[styles.playBtn, {backgroundColor: mine ? colors.primaryDark : colors.cardAlt}]}>
           {playingId === item.id ? (
             <ActivityIndicator color="#fff" size="small" />
