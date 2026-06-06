@@ -4,6 +4,7 @@ import {
   Alert,
   Animated,
   FlatList,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -26,6 +27,9 @@ import {ensureMicPermission, player, startCapture, stopCapture, vibrate} from '.
 import {ensureNotificationPermission, radioService} from '../service';
 
 Sound.setCategory('Playback');
+
+// أندرويد: بثّ صوتي لحظي عبر الوحدة الأصلية. iOS: تشغيل التسجيل فور وصوله (موثوق بلا كود أصلي).
+const isAndroid = Platform.OS === 'android';
 
 type Tab = 'history' | 'members';
 
@@ -86,18 +90,19 @@ export default function ChannelScreen({route, navigation}: any) {
       if (msg.channelId !== channelId || msg.user.id === me.id) return;
       setTalkingUser(msg.user);
       vibrate(60);
-      player.start(); // بثّ لحظي
+      if (isAndroid) player.start(); // بثّ لحظي (أندرويد)
       radioService.update(name, `📢 ${msg.user.displayName} يتحدث الآن`);
     });
     const offAudio = radio.on('audio', (msg: any) => {
+      if (!isAndroid) return; // iOS يعتمد تشغيل التسجيل عند الوصول
       if (msg.channelId !== channelId || msg.user.id === me.id) return;
-      player.write(msg.chunk); // تشغيل الدفعات فور وصولها
+      player.write(msg.chunk);
     });
     const offTalkEnd = radio.on('talk_end', (msg: any) => {
       if (msg.channelId !== channelId) return;
       if (talkingRef.current && msg.user.id === talkingRef.current.id) {
         setTalkingUser(null);
-        player.stop();
+        if (isAndroid) player.stop();
         radioService.update(name, 'متصل بالقناة');
       }
     });
@@ -117,6 +122,8 @@ export default function ChannelScreen({route, navigation}: any) {
     const offHistory = radio.on('history_new', (msg: any) => {
       if (msg.channelId !== channelId) return;
       setHistory(prev => [msg.message, ...prev]);
+      // iOS: شغّل تسجيل الطرف الآخر تلقائياً فور وصوله (بديل البثّ اللحظي)
+      if (!isAndroid && msg.message.userId !== me.id) playMessage(msg.message, true);
     });
 
     return () => {
