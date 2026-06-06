@@ -2,6 +2,11 @@ name: iOS unsigned build
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'Lasilki/**'
+      - '.github/workflows/ios.yml'
 
 jobs:
   build:
