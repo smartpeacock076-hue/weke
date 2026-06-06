@@ -184,6 +184,11 @@ export default function ChannelScreen({route, navigation}: any) {
       soundRef.current.release();
       soundRef.current = null;
     }
+    // إعادة فرض فئة التشغيل قبل كل تشغيل: تُخرج الصوت من السمّاعة وتتجاوز مفتاح الصامت،
+    // وتعيد الجلسة من وضع التسجيل (مهم على iOS بعد التحدّث).
+    try {
+      Sound.setCategory('Playback', false);
+    } catch {}
     setPlayingId(item.id);
     const s = new Sound(audioUrl(item.file), undefined, (err: any) => {
       if (err) {
