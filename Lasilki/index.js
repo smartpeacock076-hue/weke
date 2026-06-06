@@ -2,8 +2,7 @@
  * @format
  */
 
-import {AppRegistry, I18nManager} from 'react-native';
-import messaging from '@react-native-firebase/messaging';
+import {AppRegistry, I18nManager, Platform} from 'react-native';
 import App from './App';
 import {name as appName} from './app.json';
 
@@ -13,10 +12,12 @@ try {
   I18nManager.forceRTL(true);
 } catch {}
 
-// معالج رسائل الخلفية لـ FCM — مطلوب تسجيله خارج المكوّن.
-// رسائل الإشعار تُعرض تلقائياً من النظام عند الإغلاق/الخلفية؛ هنا لا نحتاج عملاً إضافياً.
-try {
-  messaging().setBackgroundMessageHandler(async () => {});
-} catch {}
+// معالج رسائل الخلفية لـ FCM — على أندرويد فقط (Firebase مستبعدة من iOS).
+if (Platform.OS === 'android') {
+  try {
+    const messaging = require('@react-native-firebase/messaging').default;
+    messaging().setBackgroundMessageHandler(async () => {});
+  } catch {}
+}
 
 AppRegistry.registerComponent(appName, () => App);
